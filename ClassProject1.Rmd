@@ -1,0 +1,136 @@
+---
+title: "Predicting Exercise Type"
+author: "Dan123Data"
+date: "November 15, 2015"
+output: html_document
+---
+
+## Step 1: Read in Data
+
+A note on naming convention.  I will call the original data set used to build and validate the models "OrigData."  It will be broken up into "Train" and "Holdout" datasets. The train data set will be used to train the models and the holdout will be used to validate the model.  The best model will then be used to predict the samples given in the Test data which will be called OOTFXVAL (Out Of Time Frame Cross Validation) data set.  
+```{r}
+library(caret)
+library(rattle)
+library(rpart)
+library(rpart.plot)
+library(randomForest)
+```
+
+```{r,cache=TRUE}
+set.seed(2222)
+trnUrl <- "https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv"
+testUrl <- "https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv"
+OrigData<- read.csv(url(trnUrl), na.strings=c("NA","#DIV/0!",""))
+OOTFXVAL <- read.csv(url(testUrl), na.strings=c("NA","#DIV/0!",""))
+```
+
+## Step 2: Data Exploration and cleaning: 
+
+Visual inspection and review of the data overview documents reveal that the data is a series of measurements and derivatives from accelerometers taken from various position on the subjects bodies. The data has three types of missing information - NA, "" and #Div/0! all of which were converted to missing in the read in statement above.  The first 7 columns are not useful for prediction and need to be dropped and many attributes have a high percentage of missing values. I dropped the first 7 columns and dropped any attribute with > 50% missing values.  In addition, I checked for near zero variance variable, but did not find any (once the previously mentioned cleanings were done)
+
+## Step 2a: Drop first 7 columns as they are not useful for prediction
+
+``` {r}
+OrigData<-OrigData[,8:length(colnames(OrigData))]
+```
+
+## Step 2b: Drop variables with >50% missing values (not shown for space purposes - this drops 100 variables )
+
+```{r}
+numMissing<-sapply(OrigData,function(x) sum(is.na(x)))
+#numMissing
+
+# create list of variables to drop due to too many missings
+dropMiss<-c()
+OrigDataColNames<-colnames(OrigData)
+for (i in 1:length(numMissing)) {
+  if (numMissing[i]>9811) {
+       dropMiss<-c(dropMiss,as.character(paste(OrigDataColNames[i])))
+    }
+}
+OrigData<-OrigData[,!names(OrigData) %in% dropMiss]
+```
+
+```{r}
+## Create list of variables with near zero variation
+nzv<-nearZeroVar(OrigData,saveMetrics=TRUE)
+nzv
+```
+ 
+None are near zero,  this leaves 52 variables to predict classe.  
+
+## Step 3: Split Orig Data into Training and Holdout
+Used 60% as training to build models and 40% as holdout to test how good the models are. 
+
+```{r}
+inTrain <- createDataPartition(y=OrigData$classe,
+                              p=0.6, list=FALSE)
+train <- OrigData[inTrain, ]
+holdout <- OrigData[-inTrain, ]
+dim(train); dim(holdout)
+```
+
+## Step 4a Method 1: Decision Tree
+
+First method to try: CART decision tree. 
+
+```{r}
+#install.packages("rpart.plot")
+mod1 <- rpart(classe~., data=train,method="class")
+fancyRpartPlot(mod1)
+predictMod1<-predict(mod1, holdout,type="class")
+confusionMatrix(predictMod1,holdout$classe)
+```
+
+This model misclassifies 27.4% of observations on the holdout.  
+
+
+## Step 4b Method 2: Random Forest
+
+Tried other methods - time and space prohibit showing.  Random Forest was best.  
+
+```{r,cache=TRUE}
+mod2 <- randomForest(classe~., data=train, importance=TRUE, ntree=500)
+mod2
+```
+
+Apply the model to the holdout: 
+```{r}
+
+predictMod2<-predict(mod2, holdout,type="class")
+confusionMatrix(predictMod2,holdout$classe) 
+```
+
+From the confusion matrix on holdout - misclassified 56 of 7846 or 0.0071% (71 basis points) is very low. 
+
+## Step 5: Prepare the OOTFXVAL DATA
+
+Remove the same columns on the OOTFXVAL data that we did on the Orig Data set. And Check of there are any missing values. 
+
+```{r}
+#OOTFXVAL<-OOTFXVAL[,8:length(colnames(OOTFXVAL))]
+#OOTFXVAL<-OOTFXVAL[,!names(OOTFXVAL) %in% dropMiss]
+sum(is.na(OOTFXVAL))
+```
+
+## Step 6: Predict OOTFXVAL DATA
+
+Make prediction on the 20 observations in the test file and write out to 20 files for later submission
+
+```{r}
+predict20 <- predict(mod2, OOTFXVAL, type = "class")
+predict20
+# convert to character
+predict20char<-as.character(paste(predict20[]))
+#Function to generate file
+pml_write_files = function(x){
+  n = length(x)
+  for(i in 1:n){
+    filename = paste0("problem_id_",i,".txt")
+    write.table(x[i],file=filename,quote=FALSE,row.names=FALSE,col.names=FALSE)
+  }
+}
+
+pml_write_files(predict20char)
+```
+
