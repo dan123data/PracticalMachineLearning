@@ -82,7 +82,7 @@ predictMod1<-predict(mod1, holdout,type="class")
 confusionMatrix(predictMod1,holdout$classe)
 ```
 
-This model misclassifies 27.4% of observations on the holdout.  
+This model misclassifies 27.4% of observations on the holdout. If I applied this model to the 20 test cases I would only get 15 points on the submission! I must do better! 
 
 
 ## Step 4b Method 2: Random Forest
@@ -101,7 +101,7 @@ predictMod2<-predict(mod2, holdout,type="class")
 confusionMatrix(predictMod2,holdout$classe) 
 ```
 
-From the confusion matrix on holdout - misclassified 56 of 7846 or 0.0071% (71 basis points) is very low. 
+From the confusion matrix on holdout - misclassified 56 of 7846 or 0.0071% (71 basis points) is very low.  When I apply this model to the 20 test cases I should get (100%-0.0071%)*20 = 19.86 correct which rounds to 20 correct.  In fact, when I submitted, I did get all 20 correct on the first try.  
 
 ## Step 5: Prepare the OOTFXVAL DATA
 
